@@ -1,0 +1,55 @@
+﻿@page "/book_store"
+@using MasaManga.Services;
+
+@inject BookStoreService _bookStoreService;
+
+<PageTitle>书架</PageTitle>
+
+<h1>图书管理</h1>
+<p>请先从资源网站找到漫画索引主页</p>
+<div>
+    @foreach (var book in books)
+    {
+        <MCard MinWidth="200" MaxWidth="300" Loading=@book.IsDownloading Style="display:inline-block;margin:10px;overflow:hidden;">
+            <ProgressContent>
+                <MOverlay Absolute Value="@book.IsDownloading">
+                <MProgressCircular Size="50" Value="@book.DownloadProgress" Indeterminate Color="lime">@book.DownloadProgress</MProgressCircular>
+                </MOverlay>                
+            </ProgressContent>
+            <ChildContent>
+                <MImage Alt="@book.Title" Height="350" Src="@book.Cover" />
+                <MCardTitle>@book.Title</MCardTitle>
+                <MCardText>
+                    <div>@book.TotalSection 章</div>
+                    <div>from: @book.SourceTitle</div>
+                </MCardText>
+                <MDivider Class="mx-4"></MDivider>
+                <MCardActions>
+                    @if(book.DownloadSection != book.TotalSection) {
+                        <MButton Color="deep-purple lighten-2" Text @onclick="()=>BeginDownload(book)">下载(@book.DownloadSection / @book.TotalSection )</MButton>
+                    }
+                </MCardActions>
+            </ChildContent>
+        </MCard>
+    }
+</div>
+
+
+@code {
+    List<Book> books = new List<Book>();
+    protected override void OnInitialized()
+    {
+        books = _bookStoreService.GetBooks();
+    }
+
+    async Task BeginDownload(Book book)
+    {
+        book.IsDownloading = true;
+        await _bookStoreService.BeginDownload(book.Id, (p)=>
+        {
+            book.DownloadProgress = p;
+        });
+        book.IsDownloading = false;
+        book.DownloadProgress = 100;
+    }
+}

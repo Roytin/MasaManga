@@ -1,0 +1,35 @@
+﻿@page "/source_site"
+@using MasaManga.BookSource;
+
+<PageTitle>源站</PageTitle>
+
+<h1>源站管理</h1>
+
+<p></p>
+
+<MDataTable Headers="_headers" Items="sites" ItemsPerPage="5" Class="elevation-1">
+    <ItemColContent>
+        @if (context.Header.Value == nameof(IBookSource.Url))
+        {
+            <a href="@context.Value">@context.Value</a>
+        }
+        else
+        {
+            @context.Value
+        }
+    </ItemColContent>
+</MDataTable>
+
+@code {
+    private List<DataTableHeader<IBookSource>> _headers = new List<DataTableHeader<IBookSource>> {
+        new (){ Text = "站名",Value = nameof(IBookSource.Title) },
+        new (){ Text = "链接",Value = nameof(IBookSource.Url) },
+    };
+
+    private IEnumerable<IBookSource> sites;
+
+    protected override void OnInitialized()
+    {
+        sites = SourceStore.SourceSites;
+    }
+}

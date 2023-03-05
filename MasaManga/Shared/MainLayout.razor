@@ -1,0 +1,34 @@
+﻿@inherits LayoutComponentBase
+
+<MApp>
+    <MAppBar Flat App Color="white" Class="m-bar--underline">
+        <span>masamanga</span>
+        <MSpacer></MSpacer>
+    </MAppBar>
+    <MNavigationDrawer Permanent App>
+        <MList Dense Nav>
+            <MListItem Link Href="/">
+                <MListItemContent>
+                    <MListItemTitle>Home</MListItemTitle>
+                </MListItemContent>
+            </MListItem>
+            <MListItem Link Href="book_store">
+                <MListItemContent>
+                    <MListItemTitle>书架</MListItemTitle>
+                </MListItemContent>
+            </MListItem>
+            <MListItem Link Href="source_site">
+                <MListItemContent>
+                    <MListItemTitle>源站</MListItemTitle>
+                </MListItemContent>
+            </MListItem>
+        </MList>
+    </MNavigationDrawer>
+    <MMain>
+        <MContainer Fluid>
+            <CascadingValue Value="this">
+                @Body
+            </CascadingValue>
+        </MContainer>
+    </MMain>
+</MApp>
