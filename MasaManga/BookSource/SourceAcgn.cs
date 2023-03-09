@@ -15,8 +15,11 @@ namespace MasaManga.BookSource
             List<BookSection> sections = new List<BookSection>();
             HtmlWeb web = new HtmlWeb();
             var htmlDoc = web.Load(book.IndexUrl);
+            book.Title = htmlDoc.DocumentNode.SelectSingleNode("/html/body/div[2]/div/div[3]/div[1]/div[2]/h3/a").InnerText;
             var coverImgNode = htmlDoc.DocumentNode.SelectSingleNode("/html/body/div[2]/div/div[3]/div[1]/div[3]/div[4]/dl/dd[1]/a/img");
-            book.CoverUrl = coverImgNode.GetAttributeValue<string>("src", "");
+            Uri u1 = new Uri(book.IndexUrl, UriKind.Absolute);
+            Uri uCover = new Uri(coverImgNode.GetAttributeValue<string>("src", ""), UriKind.Relative);
+            book.CoverUrl = (new Uri(u1, uCover)).ToString();
             var liNodes = htmlDoc.DocumentNode.SelectNodes("/html/body/div[2]/div/div[3]/div[1]/div[3]/div[7]/ul/li/a");
             foreach (var pageNode in liNodes)
             {
@@ -24,7 +27,6 @@ namespace MasaManga.BookSource
                 var href = pageNode.GetAttributeValue<string>("href", "");
                 if (!href.StartsWith("http"))
                 {
-                    Uri u1 = new Uri(book.IndexUrl, UriKind.Absolute);
                     Uri u2 = new Uri(href, UriKind.Relative);
                     var uri = new Uri(u1, u2);
                     href = uri.ToString();
@@ -37,8 +39,6 @@ namespace MasaManga.BookSource
                 sections[i].Index = i + 1;
             }
             book.Sections = sections;
-            book.TotalSection = sections.Count;
-            book.IsFilled = true;
         }
 
         public void FulfilSection(BookSection section)
@@ -54,12 +54,9 @@ namespace MasaManga.BookSource
                 ++i;
                 int lastPointIndex = src.LastIndexOf('.');
                 string suffix = src.Substring(lastPointIndex);
-                pics.Add(new BookPic { Index = i, Url = src, FileName = i + suffix });
+                pics.Add(new BookPic { Index = i, SectionIndex = section.Index, Url = src, FileName = i + suffix });
             }
-            section.TotalPic = pics.Count;
             section.Pics = pics;
-            section.IsFilled = true;
-            section.IsDownloaded = false;
         }
     }
 }

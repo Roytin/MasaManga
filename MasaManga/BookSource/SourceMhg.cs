@@ -37,7 +37,6 @@ namespace MasaManga.BookSource
                 sections[i].Index = i + 1;
             }
             book.Sections = sections;
-            book.TotalSection = sections.Count;
         }
 
         public void FulfilSection(BookSection section)
@@ -53,11 +52,9 @@ namespace MasaManga.BookSource
                 ++i;
                 int lastPointIndex = src.LastIndexOf('.');
                 string suffix = src.Substring(lastPointIndex);
-                pics.Add(new BookPic { Index = i, Url = src, FileName = i + suffix });
+                pics.Add(new BookPic { Index = i, SectionIndex = section.Index, Url = src, FileName = i + suffix });
             }
-            section.TotalPic = pics.Count;
             section.Pics = pics;
-            section.IsDownloaded = false;
         }
     }
 }

@@ -1,43 +1,127 @@
 ﻿@page "/book_store"
 @using MasaManga.Services;
+@using System.ComponentModel.DataAnnotations;
 
+@implements IDisposable;
 @inject BookStoreService _bookStoreService;
-
+@inject IPopupService PopupService;
 <PageTitle>书架</PageTitle>
 
-<h1>图书管理</h1>
-<p>请先从资源网站找到漫画索引主页</p>
-<div>
-    @foreach (var book in books)
-    {
-        <MCard MinWidth="200" MaxWidth="300" Loading=@book.IsDownloading Style="display:inline-block;margin:10px;overflow:hidden;">
-            <ProgressContent>
-                <MOverlay Absolute Value="@book.IsDownloading">
-                <MProgressCircular Size="50" Value="@book.DownloadProgress" Indeterminate Color="lime">@book.DownloadProgress</MProgressCircular>
-                </MOverlay>                
-            </ProgressContent>
-            <ChildContent>
-                <MImage Alt="@book.Title" Height="350" Src="@book.Cover" />
-                <MCardTitle>@book.Title</MCardTitle>
-                <MCardText>
-                    <div>@book.TotalSection 章</div>
-                    <div>from: @book.SourceTitle</div>
-                </MCardText>
-                <MDivider Class="mx-4"></MDivider>
-                <MCardActions>
-                    @if(book.DownloadSection != book.TotalSection) {
-                        <MButton Color="deep-purple lighten-2" Text @onclick="()=>BeginDownload(book)">下载(@book.DownloadSection / @book.TotalSection )</MButton>
-                    }
-                </MCardActions>
-            </ChildContent>
-        </MCard>
-    }
-</div>
+<p>请先从资源网站找到索引主页</p>
+<MDataTable Headers="_headers" Items="books" ItemsPerPage="5" Class="elevation-1">
+     <TopContent>
+         <MToolbar Flat>
+        <MToolbarTitle>书架</MToolbarTitle>
+        <MDivider Class="mx-4"
+                    Inset
+                    Vertical></MDivider>
+            <MSpacer></MSpacer>
+            <MDialog @bind-Value="dialog"
+                     Persistent
+                     MaxWidth="600">
+                <ActivatorContent>
+                    <MButton Color="primary"
+                             Dark
+                             Class="mb-2"
+                             OnClick="()=>dialog=true">
+                        添加书籍
+                    </MButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <MForm Model="addBookRequest" EnableValidation EnableI18n>
+                        <MCard>
+                            <MCardTitle>
+                                <span class="text-h5">添加书籍</span>
+                            </MCardTitle>
+                            <MCardText>
+                                <MContainer>
+                                    <MRow>
+                                        <MCol Cols="12">
+                                            <MTextField Label="书的地址*" TValue="string" @bind-Value="addBookRequest.IndexUrl"></MTextField>
+                                        </MCol>
+                                    </MRow>
+                                </MContainer>
+                            </MCardText>
+                            <MCardActions>
+                                <MSpacer></MSpacer>
+                                <MButton Color="blue darken-1"
+                                         Text
+                                         OnClick="() => dialog = false">
+                                    取消
+                                </MButton>
+                                <MButton Color="blue darken-1"
+                                         Text
+                                         OnClick="HandleOnValidSubmit">
+                                    确定
+                                </MButton>
+                            </MCardActions>
+                        </MCard>
+                    </MForm>
+                </ChildContent>
+            </MDialog>
+        </MToolbar>
+    </TopContent>
+    <ItemColContent>
+        @if (context.Header.Value == "actions")
+        {
+            <MButton Small Color="primary" Loading="context.Item.IsDownloading"
+               OnClick="()=>BeginDownload(context.Item)">下载</MButton>
+            <MButton Small Color="error"
+               OnClick="()=>{}">删除</MButton>
+        }
+        else
+        {
+            @context.Value
+        }
+    </ItemColContent>
+    <NoDataContent>
+        <MButton Color="primary"
+                 OnClick="LoadBooks">
+            重新读取
+        </MButton>
+    </NoDataContent>
+</MDataTable>
 
+<MOverlay Value="overlay" ZIndex="1000">
+    <MProgressCircular indeterminate Size="64"></MProgressCircular>
+</MOverlay>
+@*
+<MCard MinWidth="120" MaxWidth="200" Loading=@book.IsDownloading Style="display:inline-block;margin:10px;overflow:hidden;">
+    <ProgressContent>
+        <MOverlay Absolute Value="@book.IsDownloading">
+        <MProgressCircular Size="50" Value="@(book.DownloadPage/book.TotalPage * 100.0d)" Indeterminate Color="lime">@book.DownloadPage / @book.TotalPage</MProgressCircular>
+        </MOverlay>
+    </ProgressContent>
+    <ChildContent>
+        <MImage Alt="@book.Title" Height="160" Src="@book.Cover" />
+        <MCardTitle>@book.Title</MCardTitle>
+        <MCardText>
+            <div>@book.Sections.Count 章</div>
+            <div>from: @book.SourceTitle</div>
+        </MCardText>
+        <MDivider Class="mx-4"></MDivider>
+        <MCardActions>
+            <MButton Color="deep-purple lighten-2" Text @onclick="()=>BeginDownload(book)">下载</MButton>
+        </MCardActions>
+    </ChildContent>
+</MCard>*@
 
 @code {
+    Timer timer = null;
     List<Book> books = new List<Book>();
     protected override void OnInitialized()
+    {
+        LoadBooks();
+        timer = new Timer((state)=> {
+            _ = this.InvokeAsync(() =>
+            {
+                LoadBooks();
+                this.StateHasChanged();
+            });
+        }, null, 2000, 2000);
+    }
+
+    void LoadBooks()
     {
         books = _bookStoreService.GetBooks();
     }
@@ -45,11 +129,48 @@
     async Task BeginDownload(Book book)
     {
         book.IsDownloading = true;
-        await _bookStoreService.BeginDownload(book.Id, (p)=>
+        await _bookStoreService.BeginDownload(book.Id);
+    }
+
+    private List<DataTableHeader<Book>> _headers = new List<DataTableHeader<Book>> {
+        new (){ Text = "名",Value = nameof(Book.Title) },
+        new (){ Text = "地址",Value = nameof(Book.IndexUrl) },
+        new (){ Text = "源",Value = nameof(Book.SourceTitle) },
+        new (){ Text = "总页",Value = nameof(Book.TotalPage) },
+        new (){ Text = "已下载",Value = nameof(Book.DownloadPage) },
+        new (){ Text = "操作", Value= "actions",Sortable=false }
+    };
+
+    bool dialog = false;
+    bool overlay = false;
+    private AddBookRequest addBookRequest = new();
+    class AddBookRequest
+    {
+        [Url(ErrorMessage = "请输入正确的URL格式文本")]
+        [Required(ErrorMessage = "该字段为必填字段")]
+        public string IndexUrl { get; set; }
+    }
+
+    private void HandleOnValidSubmit()
+    {
+        overlay = true;
+        Task.Run(async () =>
         {
-            book.DownloadProgress = p;
+            //await Task.Delay(3000);
+            (var ok, string err) = await _bookStoreService.AddBook(addBookRequest.IndexUrl);
+            if (!ok)
+            {
+                await PopupService.AlertAsync(err, AlertTypes.Error);
+            }
+            overlay = false;
+            dialog = false;
+            await InvokeAsync(StateHasChanged);
         });
-        book.IsDownloading = false;
-        book.DownloadProgress = 100;
+    }
+
+    public void Dispose()
+    {
+        if (timer != null)
+            timer.Dispose();
     }
 }

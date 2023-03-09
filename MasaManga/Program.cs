@@ -3,6 +3,8 @@ using MasaManga.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders().AddLog4Net().SetMinimumLevel(LogLevel.Debug);
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
@@ -20,9 +22,14 @@ builder.Services.AddMasaBlazor(builder =>
 });
 builder.Services.AddDbContext<BookStoreDbContext>(options =>
 {
-    options.UseSqlite("Data Source=bookstore.db");
-}, ServiceLifetime.Singleton);
-builder.Services.AddSingleton<BookStoreService>();
+    options.UseSqlite("Data Source=bookstore.db", o2 =>
+    {
+        o2.MaxBatchSize(1000);
+        o2.MinBatchSize(1);
+    });
+}, ServiceLifetime.Transient);
+builder.Services.AddHostedService<BookDownloadingContinueService>();
+builder.Services.AddTransient<BookStoreService>();
 
 var app = builder.Build();
 

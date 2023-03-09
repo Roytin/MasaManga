@@ -1,50 +1,38 @@
 ﻿namespace MasaManga.Utils
 {
-    public static class FileDownloader
+    public class FileDownloader
     {
-        public class File
+        HttpClient _webClient;
+        public FileDownloader()
         {
-            public object Target { get; set; }
-            public string Url { get; set; }
-            public string Filename { get; set; }
+            _webClient = new HttpClient();
+            _webClient.Timeout = TimeSpan.FromMinutes(1);
         }
 
-        public static async Task DownloadAsync(int wokers, Func<File> getFile, DownloadEnd onDownloadEnd)
+        public async Task DownloadAsync(string url, string fileName)
         {
-            var tasks = new List<Task>();
-            for (int i = 0; i < wokers; i++)
-            {
-                var t = DownloadAsync(getFile, onDownloadEnd);
-                tasks.Add(t);
-            }
-            await Task.WhenAll(tasks);
-        }
-
-        public static async Task DownloadAsync(Func<File> getFile, DownloadEnd onDownloadEnd)
-        {
-            HttpClient webClient = new HttpClient();
-            webClient.Timeout = TimeSpan.FromMinutes(1);
-            var f = getFile();
-            while (f != null)
+            int retry = 3;
+            bool done = File.Exists(fileName);
+            Exception ex = null;
+            while(!done && retry > 0)
             {
                 try
                 {
-                    if (!System.IO.File.Exists(f.Filename))
-                    {
-                        using var stream = await webClient.GetStreamAsync(new Uri(f.Url));
-                        using var fileStream = System.IO.File.Open(f.Filename, FileMode.OpenOrCreate);
-                        await stream.CopyToAsync(fileStream);
-                        await fileStream.FlushAsync();
-                    }
-                    onDownloadEnd(f, true);
-                    f = getFile();
+                    retry --;
+                    using var stream = await _webClient.GetStreamAsync(new Uri(url));
+                    using var fileStream = File.Open(fileName, FileMode.OpenOrCreate);
+                    await stream.CopyToAsync(fileStream);
+                    await fileStream.FlushAsync();
+                    done = true;
+                    ex = null;
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    onDownloadEnd(f, false);
+                    ex = exception;
                 }
             }
+            if (ex != null)
+                throw ex;
         }
-        public delegate void DownloadEnd(File file, bool isOk);
     }
 }

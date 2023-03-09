@@ -1,15 +1,20 @@
 ﻿@inherits LayoutComponentBase
 
 <MApp>
-    <MAppBar Flat App Color="white" Class="m-bar--underline">
-        <span>masamanga</span>
+ @*   <MAppBar Flat App Color="white" Class="m-bar--underline">
+        <h2>剃刀书店</h2>
         <MSpacer></MSpacer>
+    </MAppBar>*@ 
+    <MAppBar App>
+        <MAppBarNavIcon @onclick="()=>_drawer = !_drawer"></MAppBarNavIcon>
+        <MToolbarTitle>剃刀书店</MToolbarTitle>
     </MAppBar>
-    <MNavigationDrawer Permanent App>
+    <MNavigationDrawer @bind-Value="_drawer" App>
+        <MDivider Class="mx-4"></MDivider>
         <MList Dense Nav>
             <MListItem Link Href="/">
                 <MListItemContent>
-                    <MListItemTitle>Home</MListItemTitle>
+                    <MListItemTitle>首页</MListItemTitle>
                 </MListItemContent>
             </MListItem>
             <MListItem Link Href="book_store">
@@ -25,10 +30,14 @@
         </MList>
     </MNavigationDrawer>
     <MMain>
-        <MContainer Fluid>
+        <MContainer Class="py-8 px-6" Fluid>
             <CascadingValue Value="this">
                 @Body
             </CascadingValue>
         </MContainer>
     </MMain>
 </MApp>
+
+@code{
+    private bool _drawer;
+}

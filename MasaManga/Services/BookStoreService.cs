@@ -21,78 +21,75 @@ namespace MasaManga.Services
 
         public List<Book> GetBooks()
         {
-            return _bookStoreDbContext.Books
-                //.Include(x=>x.Sections)
-                //    .ThenInclude(s=>s.Pics)
-                .ToList();
+            var books = _bookStoreDbContext.Books.AsNoTracking().ToList();
+            return books;
         }
 
-        public async Task BeginDownload(int bookId, Action<int> onProgress)
+        public async Task<(bool ok, string err)> AddBook(string indexUrl)
+        {
+            try
+            {
+                var source = SourceStore.SourceSites.FirstOrDefault(x => indexUrl.StartsWith(x.Url));
+                if (source == null)
+                    return (false, "源不存在");
+                if(_bookStoreDbContext.Books.Any(x=>x.IndexUrl == indexUrl))
+                    return (false, "书已添加");
+                var book = new Book() { IndexUrl = indexUrl, SourceTitle = source.Title };
+                source.FulfilBook(book);
+                Parallel.ForEach(book.Sections, section =>
+                {
+                    source.FulfilSection(section);
+                });
+                book.TotalPage = book.Sections.Sum(x => x.Pics.Count);
+                _bookStoreDbContext.Books.Add(book);
+                await _bookStoreDbContext.SaveChangesAsync();
+                book.Cover = $"wwwroot/store/{book.Title}/cover.jpg";
+                var downloader = new FileDownloader();
+                await downloader.DownloadAsync(book.CoverUrl, book.Cover);
+                return (true, "");
+            }
+            catch(Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
+        public async Task BeginDownload(int bookId)
         {
             var book = _bookStoreDbContext.Books
                 .Include(x => x.Sections)
                     .ThenInclude(x => x.Pics)
                 .FirstOrDefault(x=>x.Id == bookId);
+            if (book == null)
+                return;
+            if (book.IsDownloading)
+                return;
             string bookPath = $"wwwroot/store/{book.Title}";
             book.IsDownloading = true;
-            var source = SourceStore.SourceSites.FirstOrDefault(x=>x.Title == book.SourceTitle);
-            if (!book.IsFilled)
+            book.DownloadPage = book.Sections.Sum(x => x.Pics.Count(p => p.IsDownloaded));
+            _bookStoreDbContext.SaveChanges();
+            //开启下载
+            //todo: 增加多线程下载
+            var downloader = new FileDownloader();
+            foreach (var section in book.Sections.OrderBy(s=>s.Index))
             {
-                source.FulfilBook(book);
-                book.IsFilled = true;
-                _bookStoreDbContext.SaveChanges();
-            }
-            double progress = 0.0d;
-            foreach(var section in book.Sections.OrderBy(s=>s.Index))
-            {
-                if(!section.IsDownloaded)
+                var dirPath = Path.Combine(bookPath, section.Title);
+                Directory.CreateDirectory(dirPath);
+                foreach (var pic in section.Pics)
                 {
-                    if (!section.IsFilled)
-                    {
-                        source.FulfilSection(section);
-                        section.IsFilled = true;
-                        _bookStoreDbContext.SaveChanges();
-                    }
-
-                    var dirPath = Path.Combine(bookPath, section.Title);
-                    Directory.CreateDirectory(dirPath);
+                    if (pic.IsDownloaded)
+                        continue;
+                    string filename = Path.Combine(dirPath, pic.FileName);
                     Console.WriteLine($"开始下载：{section.Title}");
-                    var picsQueue = new ConcurrentQueue<BookPic>(section.Pics);
-                    await FileDownloader.DownloadAsync( 
-                        () =>
-                        {
-                            if(picsQueue.TryDequeue(out var pic))
-                            {
-                                string filename = Path.Combine(dirPath, pic.FileName);
-                                return new FileDownloader.File { Filename = filename, Url = pic.Url, Target = pic };
-                            }
-                            return null;
-                        },
-                        (b, isOk) =>
-                        {
-                            if(isOk)
-                            {
-                                if(b.Target is BookPic pic)
-                                {
-                                    pic.IsDownloaded = true;
-                                    section.DownloadPic += 1;
-                                    _bookStoreDbContext.SaveChanges();
-                                    
-                                    progress += 100.0d / book.TotalSection / section.TotalPic * section.Index;
-                                    onProgress((int)progress);
-                                }
-                            }
-                        });
-                    if(section.DownloadPic == section.TotalPic)
-                    {
-                        section.IsDownloaded = true;
-                        _bookStoreDbContext.SaveChanges();
-                    }
+                    await downloader.DownloadAsync(pic.Url, filename);
+                    pic.IsDownloaded = true;
+                    book.DownloadPage++;
+                    _bookStoreDbContext.SaveChanges();
                 }
-                progress = (int)(100.0d / book.TotalSection * section.Index);
-                onProgress((int)progress);
             }
+            book.DownloadPage = book.Sections.Sum(x => x.Pics.Count(p => p.IsDownloaded));
             book.IsDownloading = false;
+            _bookStoreDbContext.SaveChanges();
         }
     }
 }

@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MasaManga.Migrations
 {
     [DbContext(typeof(BookStoreDbContext))]
-    [Migration("20230305142128_V3")]
-    partial class V3
+    [Migration("20230309081448_V1")]
+    partial class V1
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -32,13 +32,13 @@ namespace MasaManga.Migrations
                     b.Property<string>("CoverUrl")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("DownloadSection")
+                    b.Property<int>("DownloadPage")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("IndexUrl")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsFilled")
+                    b.Property<bool>("IsDownloading")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("SourceTitle")
@@ -47,7 +47,7 @@ namespace MasaManga.Migrations
                     b.Property<string>("Title")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("TotalSection")
+                    b.Property<int>("TotalPage")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
@@ -76,6 +76,9 @@ namespace MasaManga.Migrations
                     b.Property<bool>("IsDownloaded")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("SectionIndex")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Url")
                         .HasColumnType("TEXT");
 
@@ -83,7 +86,7 @@ namespace MasaManga.Migrations
 
                     b.HasIndex("BookSectionId");
 
-                    b.ToTable("BookPic");
+                    b.ToTable("BookPics");
                 });
 
             modelBuilder.Entity("MasaManga.Data.BookSection", b =>
@@ -95,23 +98,11 @@ namespace MasaManga.Migrations
                     b.Property<int?>("BookId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("DownloadPic")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("Index")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDownloaded")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsFilled")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("TotalPic")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Url")
                         .HasColumnType("TEXT");
@@ -120,21 +111,23 @@ namespace MasaManga.Migrations
 
                     b.HasIndex("BookId");
 
-                    b.ToTable("BookSection");
+                    b.ToTable("BookSections");
                 });
 
             modelBuilder.Entity("MasaManga.Data.BookPic", b =>
                 {
                     b.HasOne("MasaManga.Data.BookSection", null)
                         .WithMany("Pics")
-                        .HasForeignKey("BookSectionId");
+                        .HasForeignKey("BookSectionId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("MasaManga.Data.BookSection", b =>
                 {
                     b.HasOne("MasaManga.Data.Book", null)
                         .WithMany("Sections")
-                        .HasForeignKey("BookId");
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("MasaManga.Data.Book", b =>
