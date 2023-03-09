@@ -6,7 +6,7 @@ namespace MasaManga.BookSource
 {
     public class SourceAcgn: IBookSource
     {
-        public string Title => "动漫戏说";
+        public string Title => "ACGN";
 
         public string Url => "https://comic.acgn.cc/";
 

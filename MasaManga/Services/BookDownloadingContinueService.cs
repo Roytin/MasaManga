@@ -13,21 +13,30 @@ namespace MasaManga.Services
             _serviceProvider = serviceProvider;
         }
 
+        private Task task;
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _ = Task.Run(async () =>
+            List<int> bookIds;
+            using (var scope = _serviceProvider.CreateScope())
             {
-                using var scope = _serviceProvider.CreateScope();
-                var dbContext = scope.ServiceProvider.GetService<BookStoreDbContext>();
-                var books = await dbContext.Books
-                    .Include(x => x.Sections)
-                        .ThenInclude(x => x.Pics)
+                var dbContextA = scope.ServiceProvider.GetService<BookStoreDbContext>();
+                bookIds = dbContextA.Books
                     .Where(x => x.IsDownloading)
-                    .ToListAsync();
-                foreach (var book in books)
+                    .Select(x=>x.Id)
+                    .ToList();
+            }
+            task = Task.Run(() =>
+            {
+                Parallel.ForEach(bookIds, async (bookId) =>
                 {
+                    using var scope = _serviceProvider.CreateScope();
+                    var dbContext = scope.ServiceProvider.GetService<BookStoreDbContext>();
+                    var book = dbContext.Books
+                        .Include(x => x.Sections)
+                            .ThenInclude(x => x.Pics)
+                        .First(x=>x.Id == bookId);
                     var downloaded = book.Sections.Sum(x => x.Pics.Count(p => p.IsDownloaded));
-                    if(downloaded != book.DownloadPage)
+                    if (downloaded != book.DownloadPage)
                     {
                         book.DownloadPage = downloaded;
                         dbContext.SaveChanges();
@@ -50,13 +59,17 @@ namespace MasaManga.Services
                             dbContext.SaveChanges();
                         }
                     }
-                }
+                });
             });
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
+            if(task != null)
+            {
+                task.Dispose();
+            }
             return Task.CompletedTask;
         }
     }

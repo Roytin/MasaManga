@@ -12,16 +12,18 @@ namespace MasaManga.Services
 {
     public class BookStoreService
     {
-        private readonly BookStoreDbContext _bookStoreDbContext;
+        private readonly IServiceProvider _serviceProvider;
 
-        public BookStoreService(BookStoreDbContext bookStoreDbContext)
+        public BookStoreService(IServiceProvider serviceProvider)
         {
-            _bookStoreDbContext = bookStoreDbContext;
+            _serviceProvider = serviceProvider;
         }
 
         public List<Book> GetBooks()
         {
-            var books = _bookStoreDbContext.Books.AsNoTracking().ToList();
+            using var scope = _serviceProvider.CreateScope();
+            using var dbContext = scope.ServiceProvider.GetService<BookStoreDbContext>();
+            var books = dbContext.Books.AsNoTracking().ToList();
             return books;
         }
 
@@ -29,10 +31,12 @@ namespace MasaManga.Services
         {
             try
             {
+                using var scope = _serviceProvider.CreateScope();
+                using var dbContext = scope.ServiceProvider.GetService<BookStoreDbContext>();
                 var source = SourceStore.SourceSites.FirstOrDefault(x => indexUrl.StartsWith(x.Url));
                 if (source == null)
                     return (false, "源不存在");
-                if(_bookStoreDbContext.Books.Any(x=>x.IndexUrl == indexUrl))
+                if(dbContext.Books.Any(x=>x.IndexUrl == indexUrl))
                     return (false, "书已添加");
                 var book = new Book() { IndexUrl = indexUrl, SourceTitle = source.Title };
                 source.FulfilBook(book);
@@ -41,11 +45,11 @@ namespace MasaManga.Services
                     source.FulfilSection(section);
                 });
                 book.TotalPage = book.Sections.Sum(x => x.Pics.Count);
-                _bookStoreDbContext.Books.Add(book);
-                await _bookStoreDbContext.SaveChangesAsync();
-                book.Cover = $"wwwroot/store/{book.Title}/cover.jpg";
-                var downloader = new FileDownloader();
-                await downloader.DownloadAsync(book.CoverUrl, book.Cover);
+                dbContext.Books.Add(book);
+                await dbContext.SaveChangesAsync();
+                //book.Cover = $"wwwroot/store/{book.Title}/cover.jpg";
+                //var downloader = new FileDownloader();
+                //await downloader.DownloadAsync(book.CoverUrl, book.Cover);
                 return (true, "");
             }
             catch(Exception ex)
@@ -56,7 +60,9 @@ namespace MasaManga.Services
 
         public async Task BeginDownload(int bookId)
         {
-            var book = _bookStoreDbContext.Books
+            using var scope = _serviceProvider.CreateScope();
+            using var dbContext = scope.ServiceProvider.GetService<BookStoreDbContext>();
+            var book = dbContext.Books
                 .Include(x => x.Sections)
                     .ThenInclude(x => x.Pics)
                 .FirstOrDefault(x=>x.Id == bookId);
@@ -67,7 +73,7 @@ namespace MasaManga.Services
             string bookPath = $"wwwroot/store/{book.Title}";
             book.IsDownloading = true;
             book.DownloadPage = book.Sections.Sum(x => x.Pics.Count(p => p.IsDownloaded));
-            _bookStoreDbContext.SaveChanges();
+            dbContext.SaveChanges();
             //开启下载
             //todo: 增加多线程下载
             var downloader = new FileDownloader();
@@ -84,12 +90,12 @@ namespace MasaManga.Services
                     await downloader.DownloadAsync(pic.Url, filename);
                     pic.IsDownloaded = true;
                     book.DownloadPage++;
-                    _bookStoreDbContext.SaveChanges();
+                    dbContext.SaveChanges();
                 }
             }
             book.DownloadPage = book.Sections.Sum(x => x.Pics.Count(p => p.IsDownloaded));
             book.IsDownloading = false;
-            _bookStoreDbContext.SaveChanges();
+            dbContext.SaveChanges();
         }
     }
 }

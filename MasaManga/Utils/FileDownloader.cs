@@ -11,7 +11,7 @@
 
         public async Task DownloadAsync(string url, string fileName)
         {
-            int retry = 3;
+            int retry = 3000;
             bool done = File.Exists(fileName);
             Exception ex = null;
             while(!done && retry > 0)
